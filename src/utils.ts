@@ -1,6 +1,6 @@
 import { UserAccount, UserList } from "./types";
 
-export const NULL_ADDRESS = "0x0000000000000000000000000000000000000000"
+export const NULL_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export const getOrCreateUser = (
   address: string,
@@ -20,9 +20,13 @@ export const getOrCreateUser = (
   }
 };
 
-export const updateStakingWeights = (userList: UserList) => {
+export const updateAllStakingWeights = (userList: UserList) => {
   // Update all account with the rule min(lp balance, debt)
   Object.values(userList).map((x) => {
     x.stakingWeight = Math.min(x.debt, x.raiLPBalance);
   });
+};
+
+export const updateStakingWeight = (user: UserAccount) => {
+  user.stakingWeight = Math.min(user.debt, user.raiLPBalance);
 };

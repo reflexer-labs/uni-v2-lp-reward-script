@@ -2,7 +2,7 @@ import { config } from "./config";
 import { subgraphQuery, subgraphQueryPaginated } from "./subgraph";
 import { UserList } from "./types";
 import { provider } from "./chain";
-import { getOrCreateUser, updateStakingWeights } from "./utils";
+import { getOrCreateUser, updateAllStakingWeights } from "./utils";
 
 export const getInitialState = async (startBlock: number) => {
   console.log("Fetch initial state...");
@@ -34,7 +34,7 @@ export const getInitialState = async (startBlock: number) => {
   }
 
   // Set the initial staking weights
-  updateStakingWeights(users);
+  updateAllStakingWeights(users);
 
   console.log("Finished loading initial state");
   return users;
@@ -48,14 +48,7 @@ const getInitialSafesDebt = async (startBlock: number) => {
   }[] = await subgraphQueryPaginated(debtQuery, "safes", config().SUBGRAPH_URL);
 
   // We need the adjusted debt after accumulated rate for the initial state
-  const accumulatedRate = Number(
-    (
-      await subgraphQuery(
-        `{collateralType(id: "ETH-A", block: {number: ${startBlock}}) {accumulatedRate}}`,
-        config().SUBGRAPH_URL
-      )
-    ).collateralType.accumulatedRate
-  );
+  const accumulatedRate = await getAccumulatedRate(startBlock);
 
   return debtsGraph.map((x) => ({
     address: x.owner.address,
@@ -90,4 +83,15 @@ const getInitialRaiLpBalances = async (startBlock: number) => {
     address: x.address,
     balance: (Number(x.balance) * raiRaiReserve) / totalLPSupply,
   }));
+};
+
+export const getAccumulatedRate = async (block: number) => {
+  return Number(
+    (
+      await subgraphQuery(
+        `{collateralType(id: "ETH-A", block: {number: ${block}}) {accumulatedRate}}`,
+        config().SUBGRAPH_URL
+      )
+    ).collateralType.accumulatedRate
+  );
 };
