@@ -2,11 +2,12 @@ import { config as dotenv } from "dotenv";
 
 dotenv();
 
-type Config = {
-  SUBGRAPH_URL: string;
-  START_BLOCK: string;
-  END_BLOCK: string;
-  RPC_URL: string;
+export const config = () => {
+  const envs = process.env as any;
+  return {
+    SUBGRAPH_URL: envs.SUBGRAPH_URL,
+    RPC_URL: envs.RPC_URL,
+    START_BLOCK: Number(envs.START_BLOCK),
+    END_BLOCK: Number(envs.END_BLOCK),
+  };
 };
-
-export const config = (process.env as any) as Config;

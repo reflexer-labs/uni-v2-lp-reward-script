@@ -45,14 +45,14 @@ const getInitialSafesDebt = async (startBlock: number) => {
   const debtsGraph: {
     debt: number;
     owner: { address: string };
-  }[] = await subgraphQueryPaginated(debtQuery, "safes", config.SUBGRAPH_URL);
+  }[] = await subgraphQueryPaginated(debtQuery, "safes", config().SUBGRAPH_URL);
 
   // We need the adjusted debt after accumulated rate for the initial state
   const accumulatedRate = Number(
     (
       await subgraphQuery(
         `{collateralType(id: "ETH-A", block: {number: ${startBlock}}) {accumulatedRate}}`,
-        config.SUBGRAPH_URL
+        config().SUBGRAPH_URL
       )
     ).collateralType.accumulatedRate
   );
@@ -71,13 +71,13 @@ const getInitialRaiLpBalances = async (startBlock: number) => {
   }[] = await subgraphQueryPaginated(
     lpTokenBalancesQuery,
     "erc20Balances",
-    config.SUBGRAPH_URL
+    config().SUBGRAPH_URL
   );
 
   // We need the pool state to convert LP balance to RAI holdings
   const poolState = await subgraphQuery(
     `{systemState(id: "current", block: {number: ${startBlock} }) {coinUniswapPair{reserve0,totalSupply}}}`,
-    config.SUBGRAPH_URL
+    config().SUBGRAPH_URL
   );
 
   const raiRaiReserve = Number(poolState.systemState.coinUniswapPair.reserve0);
