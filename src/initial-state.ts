@@ -1,8 +1,7 @@
 import { config } from "./config";
 import { subgraphQuery, subgraphQueryPaginated } from "./subgraph";
 import { UserList } from "./types";
-import { provider } from "./chain";
-import { getOrCreateUser, updateAllStakingWeights } from "./utils";
+import { getOrCreateUser, lpBalanceToRaiLpBalance } from "./utils";
 
 export const getInitialState = async (startBlock: number) => {
   console.log("Fetch initial state...");
@@ -15,28 +14,44 @@ export const getInitialState = async (startBlock: number) => {
   const debts = await getInitialSafesDebt(startBlock);
 
   console.log(`  Fetched ${debts.length} debt balances`);
-  const initialTimestamp = (await provider.getBlock(startBlock)).timestamp;
 
   // Combine debt and LP balances
   const users: UserList = {};
   for (let bal of balances) {
     const user = getOrCreateUser(bal.address, users);
-    user.raiLPBalance = bal.balance;
-    user.lastUpdated = initialTimestamp;
+    user.lpBalance = bal.lpBalance;
+    user.raiLpBalance = bal.raiLpBalance;
     users[bal.address] = user;
   }
 
   for (let debt of debts) {
     const user = getOrCreateUser(debt.address, users);
-    user.debt = debt.debt;
-    user.lastUpdated = initialTimestamp;
+    user.debt += debt.debt;
     users[debt.address] = user;
   }
 
   // Set the initial staking weights
-  updateAllStakingWeights(users);
+  Object.values(users).map((u) => {
+    u.stakingWeight = Math.min(u.debt, u.raiLpBalance);
+  });
 
-  console.log("Finished loading initial state");
+  // Sanity checks
+  for (let user of Object.values(users)) {
+    if (
+      user.debt == undefined ||
+      user.earned == undefined ||
+      user.lpBalance == undefined ||
+      user.raiLpBalance == undefined ||
+      user.rewardPerWeightStored == undefined ||
+      user.stakingWeight == undefined
+    ) {
+      throw Error(`Inconsistent initial state user ${user}`);
+    }
+  }
+
+  console.log(
+    `Finished loading initial state for ${Object.keys(users).length} users`
+  );
   return users;
 };
 
@@ -68,20 +83,17 @@ const getInitialRaiLpBalances = async (startBlock: number) => {
   );
 
   // We need the pool state to convert LP balance to RAI holdings
-  const poolState = await subgraphQuery(
-    `{systemState(id: "current", block: {number: ${startBlock} }) {coinUniswapPair{reserve0,totalSupply}}}`,
-    config().SUBGRAPH_URL
-  );
-
-  const raiRaiReserve = Number(poolState.systemState.coinUniswapPair.reserve0);
-  const totalLPSupply = Number(
-    poolState.systemState.coinUniswapPair.totalSupply
-  );
+  const { uniRaiReserve, totalLpSupply } = await getPoolState(startBlock);
 
   // RAI LP balance = LP balance * RAI reserve  / total LP supply
   return balancesGraph.map((x) => ({
     address: x.address,
-    balance: (Number(x.balance) * raiRaiReserve) / totalLPSupply,
+    lpBalance: Number(x.balance),
+    raiLpBalance: lpBalanceToRaiLpBalance(
+      Number(x.balance),
+      uniRaiReserve,
+      totalLpSupply
+    ),
   }));
 };
 
@@ -94,4 +106,21 @@ export const getAccumulatedRate = async (block: number) => {
       )
     ).collateralType.accumulatedRate
   );
+};
+
+export const getPoolState = async (block: number) => {
+  const poolState = await subgraphQuery(
+    `{systemState(id: "current", block: {number: ${block} }) {coinUniswapPair{reserve0,totalSupply}}}`,
+    config().SUBGRAPH_URL
+  );
+
+  const uniRaiReserve = Number(poolState.systemState.coinUniswapPair.reserve0);
+  const totalLpSupply = Number(
+    poolState.systemState.coinUniswapPair.totalSupply
+  );
+
+  return {
+    uniRaiReserve,
+    totalLpSupply,
+  };
 };

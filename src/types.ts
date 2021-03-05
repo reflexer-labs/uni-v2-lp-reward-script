@@ -1,9 +1,11 @@
 // For a single user
 export type UserAccount = {
   debt: number;
-  raiLPBalance: number;
+  lpBalance: number;
+  raiLpBalance: number;
   stakingWeight: number;
-  lastUpdated: number;
+  rewardPerWeightStored: number;
+  earned: number
 };
 
 // Main data structure

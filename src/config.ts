@@ -9,5 +9,6 @@ export const config = () => {
     RPC_URL: envs.RPC_URL,
     START_BLOCK: Number(envs.START_BLOCK),
     END_BLOCK: Number(envs.END_BLOCK),
+    REWARD_AMOUNT: Number(envs.REWARD_AMOUNT),
   };
 };

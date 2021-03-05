@@ -12,7 +12,6 @@ export const getEvents = async (startBlock: number, endBlock: number) => {
     getSyncEvents(startBlock, endBlock),
     getUpdateAccumulatedRateEvent(startBlock, endBlock),
   ]);
-  console.log(`Fetched all events`);
 
   let events = res.reduce((a, b) => a.concat(b), []);
 
@@ -31,7 +30,35 @@ export const getEvents = async (startBlock: number, endBlock: number) => {
     }
   });
 
-  console.log(events);
+  console.log(`Fetched a total of ${events.length} events`);
+
+  // Sanity checks
+  for (let e of events) {
+    if (
+      !e ||
+      e.logIndex == undefined ||
+      !e.timestamp ||
+      e.type == undefined ||
+      !e.value == undefined
+    ) {
+      throw Error(`Inconsistent event: ${JSON.stringify(e)}`);
+    }
+
+    if (
+      e.type === RewardEventType.DELTA_LP ||
+      // @ts-ignore
+      e.type === RewardEventType.DELTA_DEBT
+    ) {
+      if (!e.address) {
+        throw Error(`Inconsistent event: ${JSON.stringify(e)}`);
+      }
+    } else {
+      if (e.address) {
+        throw Error(`Inconsistent event: ${JSON.stringify(e)}`);
+      }
+    }
+  }
+
   return events;
 };
 
@@ -107,33 +134,22 @@ const getLpBalanceDelta = async (
 
   // Create 2 balance delta events for each transfer (outgoing & incoming)
   for (let event of data) {
-    if (event.source !== NULL_ADDRESS) {
-      events.push({
-        type: RewardEventType.DELTA_LP,
-        value: -1 * Number(event.amount),
-        address: event.source,
-        logIndex: getLogIndexFromId(event.id),
-        timestamp: Number(event.createdAt),
-      });
-    }
+    events.push({
+      type: RewardEventType.DELTA_LP,
+      value: -1 * Number(event.amount),
+      address: event.source,
+      logIndex: getLogIndexFromId(event.id),
+      timestamp: Number(event.createdAt),
+    });
 
-    if (event.destination !== NULL_ADDRESS) {
-      events.push({
-        type: RewardEventType.DELTA_LP,
-        value: Number(event.amount),
-        address: event.destination,
-        logIndex: getLogIndexFromId(event.id),
-        timestamp: Number(event.createdAt),
-      });
-    }
+    events.push({
+      type: RewardEventType.DELTA_LP,
+      value: Number(event.amount),
+      address: event.destination,
+      logIndex: getLogIndexFromId(event.id),
+      timestamp: Number(event.createdAt),
+    });
   }
-
-  // Sanity check
-  events.map((x) => {
-    if (!x || !x.address || x.address === "") {
-      throw Error(`Incorrect Delta LP event ${x}`);
-    }
-  });
 
   return events;
 };
@@ -194,7 +210,7 @@ const getUpdateAccumulatedRateEvent = async (
 
   const events = data.map((x) => ({
     type: RewardEventType.UPDATE_ACCUMULATED_RATE,
-    value: Number(x.rateMultiplier) + 1,
+    value: Number(x.rateMultiplier),
     logIndex: getLogIndexFromId(x.id),
     timestamp: Number(x.createdAt),
   }));
