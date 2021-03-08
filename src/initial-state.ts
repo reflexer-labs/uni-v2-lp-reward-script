@@ -1,7 +1,7 @@
 import { config } from "./config";
 import { subgraphQuery, subgraphQueryPaginated } from "./subgraph";
 import { UserList } from "./types";
-import { getOrCreateUser, lpBalanceToRaiLpBalance } from "./utils";
+import { getOrCreateUser } from "./utils";
 
 export const getInitialState = async (startBlock: number) => {
   console.log("Fetch initial state...");
@@ -89,11 +89,7 @@ const getInitialRaiLpBalances = async (startBlock: number) => {
   return balancesGraph.map((x) => ({
     address: x.address,
     lpBalance: Number(x.balance),
-    raiLpBalance: lpBalanceToRaiLpBalance(
-      Number(x.balance),
-      uniRaiReserve,
-      totalLpSupply
-    ),
+    raiLpBalance: (Number(x.balance) * uniRaiReserve) / totalLpSupply,
   }));
 };
 

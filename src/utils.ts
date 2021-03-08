@@ -23,34 +23,7 @@ export const getOrCreateUser = (
   }
 };
 
-export const lpBalanceToRaiLpBalance = (
-  lpBalance: number,
-  uniRaiReserve: number,
-  lpTotalSupply: number
-) => (lpBalance * uniRaiReserve) / lpTotalSupply;
-
-export const sanityCheck = (users: UserList, event: RewardEvent) => {
-  const numberCheck = (num) => !isFinite(num) || num < 0;
-  if (event.address && event.address !== NULL_ADDRESS) {
-    const usr = users[event.address];
-    if (
-      numberCheck(usr.debt) ||
-      numberCheck(usr.lpBalance) ||
-      numberCheck(usr.raiLpBalance) ||
-      numberCheck(usr.stakingWeight) ||
-      numberCheck(usr.earned) ||
-      numberCheck(usr.rewardPerWeightStored)
-    ) {
-      throw Error(
-        `Invalid user:\n${JSON.stringify(usr)}\n at event:\n${JSON.stringify(
-          event
-        )}`
-      );
-    }
-  }
-};
-
-export const roundToZero = (num: number) => (Math.abs(num) < 1e10 ? 0 : num);
+export const roundToZero = (num: number) => (Math.abs(num) < 1e-8 ? 0 : num);
 
 // Export results in a CSV file
 export const exportResults = (users: UserList) => {
