@@ -2,7 +2,7 @@ import { zeroPad } from "ethers/lib/utils";
 import { config } from "./config";
 import { subgraphQueryPaginated } from "./subgraph";
 import { RewardEvent, RewardEventType } from "./types";
-import { NULL_ADDRESS } from "./utils";
+import { getExclusionList, NULL_ADDRESS } from "./utils";
 
 export const getEvents = async (startBlock: number, endBlock: number) => {
   console.log(`Fetch events ...`);
@@ -13,7 +13,15 @@ export const getEvents = async (startBlock: number, endBlock: number) => {
     getUpdateAccumulatedRateEvent(startBlock, endBlock),
   ]);
 
+  // Merge all events
   let events = res.reduce((a, b) => a.concat(b), []);
+
+  // Filter out events involving the exclusion list
+  // Remove accounts from the exclusion list
+  const exclusionList = await getExclusionList();
+  events = events.filter(
+    (e) => !e.address || !exclusionList.includes(e.address)
+  );
 
   // Sort first by timestamp then by logIndex
   events = events.sort((a, b) => {

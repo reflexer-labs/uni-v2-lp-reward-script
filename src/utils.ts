@@ -48,3 +48,8 @@ export const exportResults = (users: UserList) => {
   }
   fs.writeFileSync("rewards.csv", w);
 };
+
+export const getExclusionList = async () => {
+  const f = await fs.readFileSync("exclusion-list.csv", "utf-8");
+  return f.split("\n").filter((x) => x !== "");
+};
