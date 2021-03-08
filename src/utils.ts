@@ -46,5 +46,5 @@ export const exportResults = (users: UserList) => {
   for (let u of userReward) {
     w += `${u[0]},${u[1]}\n`;
   }
-  fs.writeFileSync("reward.csv", w);
+  fs.writeFileSync("rewards.csv", w);
 };
