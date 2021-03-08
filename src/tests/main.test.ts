@@ -215,7 +215,7 @@ describe("processRewardEvent", async () => {
     expect(users["Bob"].earned).closeTo(7.5, 0.00001);
   });
 
-  it("A big price move effects people reward", async () => {
+  it("A big price move affects rewards", async () => {
     let users: UserList = {
       Alice: {
         debt: 10,
