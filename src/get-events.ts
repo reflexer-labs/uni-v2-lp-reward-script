@@ -74,7 +74,17 @@ const getSafeModificationEvents = async (
   start: number,
   end: number
 ): Promise<RewardEvent[]> => {
-  const query = `{
+  // We several kind of modifications
+
+  type SubgraphSafeModification = {
+    id: string;
+    deltaDebt: string;
+    createdAt: string;
+    safeHandler: string;
+  };
+
+  // Main event to modify a safe
+  const safeModificationQuery = `{
       modifySAFECollateralizations(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
         id
         deltaDebt
@@ -83,22 +93,78 @@ const getSafeModificationEvents = async (
       }
     }`;
 
-  const data: {
-    id: string;
-    deltaDebt: string;
-    createdAt: string;
-    safeHandler: string;
-  }[] = await subgraphQueryPaginated(
-    query,
+  const safeModifications: SubgraphSafeModification[] = await subgraphQueryPaginated(
+    safeModificationQuery,
     "modifySAFECollateralizations",
     config().SUBGRAPH_URL
   );
+
+  // Event used in liquidation
+  const confiscateSAFECollateralAndDebtsQuery = `{
+    confiscateSAFECollateralAndDebts(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
+      id
+      deltaDebt
+      safeHandler
+      createdAt
+    }
+  }`;
+
+  const confiscateSAFECollateralAndDebts: SubgraphSafeModification[] = await subgraphQueryPaginated(
+    confiscateSAFECollateralAndDebtsQuery,
+    "confiscateSAFECollateralAndDebts",
+    config().SUBGRAPH_URL
+  );
+
+  // Event transferring debt, rarely used
+  const transferSAFECollateralAndDebtsQuery = `{
+    transferSAFECollateralAndDebts(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
+      id
+      deltaDebt
+      createdAt
+      srcHandler
+      dstHandler
+    }
+  }`;
+
+  const transferSAFECollateralAndDebts: {
+    id: string;
+    deltaDebt: string;
+    createdAt: string;
+    srcHandler: string;
+    dstHandler: string;
+  }[] = await subgraphQueryPaginated(
+    transferSAFECollateralAndDebtsQuery,
+    "transferSAFECollateralAndDebts",
+    config().SUBGRAPH_URL
+  );
+
+  const transferSAFECollateralAndDebtsProcessed: SubgraphSafeModification[] = [];
+  for (let t of transferSAFECollateralAndDebts) {
+    transferSAFECollateralAndDebtsProcessed.push({
+      id: t.id,
+      deltaDebt: t.deltaDebt,
+      safeHandler: t.dstHandler,
+      createdAt: t.createdAt,
+    });
+
+    transferSAFECollateralAndDebtsProcessed.push({
+      id: t.id,
+      deltaDebt: (-1 * Number(t.deltaDebt)).toString(),
+      safeHandler: t.srcHandler,
+      createdAt: t.createdAt,
+    });
+  }
+
+  // Merge all the different kind of modifications
+  const allModifications = safeModifications
+    // .concat(confiscateSAFECollateralAndDebts)
+    .concat(transferSAFECollateralAndDebtsProcessed);
 
   // Safe owners mapping
   const owners = await getSafeOwnerMapping(end);
 
   const events: RewardEvent[] = [];
-  for (let u of data) {
+  for (let u of allModifications) {
     if (!owners.has(u.safeHandler)) {
       console.log(`Safe handler ${u.safeHandler} has no owner`);
       continue;
@@ -113,7 +179,9 @@ const getSafeModificationEvents = async (
     });
   }
 
-  console.log(`  Fetched ${events.length} safe modifications events`);
+  console.log(
+    `  Fetched ${events.length} safe modifications events including ${safeModifications.length} standard safe modification, ${confiscateSAFECollateralAndDebts.length} safe confiscations, ${transferSAFECollateralAndDebts.length} transfer safe debt`
+  );
   return events;
 };
 
