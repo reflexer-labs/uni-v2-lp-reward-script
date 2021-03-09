@@ -157,7 +157,7 @@ const getSafeModificationEvents = async (
 
   // Merge all the different kind of modifications
   const allModifications = safeModifications
-    // .concat(confiscateSAFECollateralAndDebts)
+    .concat(confiscateSAFECollateralAndDebts)
     .concat(transferSAFECollateralAndDebtsProcessed);
 
   // Safe owners mapping
