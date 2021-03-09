@@ -1,5 +1,8 @@
 import { RewardEvent, UserAccount, UserList } from "./types";
+import { subgraphQueryPaginated } from "./subgraph";
+
 import * as fs from "fs";
+import { config } from "./config";
 
 export const NULL_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -52,4 +55,32 @@ export const exportResults = (users: UserList) => {
 export const getExclusionList = async () => {
   const f = await fs.readFileSync("exclusion-list.csv", "utf-8");
   return f.split("\n").filter((x) => x !== "");
+};
+
+export const getSafeOwnerMapping = async (block: number) => {
+  let owners = new Map<string, string>();
+  const query = `{
+      safeHandlerOwners(first: 1000, skip: [[skip]], block: {number: ${block}}) {
+        id
+        owner {
+          address
+        }
+      }
+    }`;
+
+  const res: {
+    id: string;
+    owner: { address: string };
+  }[] = await subgraphQueryPaginated(
+    query,
+    "safeHandlerOwners",
+    config().SUBGRAPH_URL
+  );
+
+  console.log(`  Fetched ${res.length} safe owners`);
+  for (let a of res) {
+    owners.set(a.id, a.owner.address);
+  }
+
+  return owners;
 };

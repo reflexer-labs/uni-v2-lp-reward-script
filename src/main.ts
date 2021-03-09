@@ -7,7 +7,10 @@ import { exportResults } from "./utils";
 
 const main = async () => {
   // List of all users with their parameters
-  const users: UserList = await getInitialState(config().START_BLOCK);
+  const users: UserList = await getInitialState(
+    config().START_BLOCK,
+    config().END_BLOCK
+  );
 
   // All event modifying the reward state
   const events = await getEvents(config().START_BLOCK, config().END_BLOCK);

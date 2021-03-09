@@ -2,9 +2,13 @@ import { fstat } from "node:fs";
 import { config } from "./config";
 import { subgraphQuery, subgraphQueryPaginated } from "./subgraph";
 import { UserList } from "./types";
-import { getExclusionList, getOrCreateUser } from "./utils";
+import {
+  getExclusionList,
+  getOrCreateUser,
+  getSafeOwnerMapping,
+} from "./utils";
 
-export const getInitialState = async (startBlock: number) => {
+export const getInitialState = async (startBlock: number, endBlock: number) => {
   console.log("Fetch initial state...");
 
   // Get all LP token balance
@@ -12,7 +16,7 @@ export const getInitialState = async (startBlock: number) => {
 
   console.log(`  Fetched ${balances.length} LP token balances`);
   // Get all debts
-  const debts = await getInitialSafesDebt(startBlock);
+  const debts = await getInitialSafesDebt(startBlock, endBlock);
 
   console.log(`  Fetched ${debts.length} debt balances`);
 
@@ -62,20 +66,33 @@ export const getInitialState = async (startBlock: number) => {
   return users;
 };
 
-const getInitialSafesDebt = async (startBlock: number) => {
-  const debtQuery = `{safes(where: {debt_gt: 0}, first: 1000, skip: [[skip]],block: {number:${startBlock}}) {debt, owner { address }}}`;
+const getInitialSafesDebt = async (startBlock: number, endBlock: number) => {
+  const debtQuery = `{safes(where: {debt_gt: 0}, first: 1000, skip: [[skip]],block: {number:${startBlock}}) {debt, safeHandler}}`;
   const debtsGraph: {
     debt: number;
-    owner: { address: string };
+    safeHandler: string;
   }[] = await subgraphQueryPaginated(debtQuery, "safes", config().SUBGRAPH_URL);
+
+  // Safe owners mapping
+  const owners = await getSafeOwnerMapping(endBlock);
 
   // We need the adjusted debt after accumulated rate for the initial state
   const accumulatedRate = await getAccumulatedRate(startBlock);
 
-  return debtsGraph.map((x) => ({
-    address: x.owner.address,
-    debt: Number(x.debt) * accumulatedRate,
-  }));
+  let debts: { address: string; debt: number }[] = [];
+  for (let u of debtsGraph) {
+    if (!owners.has(u.safeHandler)) {
+      console.log(`Safe handler ${u.safeHandler} has no owner`);
+      continue;
+    }
+
+    debts.push({
+      address: owners.get(u.safeHandler),
+      debt: Number(u.debt) * accumulatedRate,
+    });
+  }
+
+  return debts;
 };
 
 const getInitialRaiLpBalances = async (startBlock: number) => {

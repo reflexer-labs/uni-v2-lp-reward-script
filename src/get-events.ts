@@ -2,7 +2,7 @@ import { zeroPad } from "ethers/lib/utils";
 import { config } from "./config";
 import { subgraphQueryPaginated } from "./subgraph";
 import { RewardEvent, RewardEventType } from "./types";
-import { getExclusionList, NULL_ADDRESS } from "./utils";
+import { getExclusionList, getSafeOwnerMapping, NULL_ADDRESS } from "./utils";
 
 export const getEvents = async (startBlock: number, endBlock: number) => {
   console.log(`Fetch events ...`);
@@ -78,33 +78,40 @@ const getSafeModificationEvents = async (
       modifySAFECollateralizations(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
         id
         deltaDebt
-        safe {
-          owner {
-            address
-          }
-        }
+        safeHandler
         createdAt
       }
     }`;
 
   const data: {
     id: string;
-    detaDebt: string;
+    deltaDebt: string;
     createdAt: string;
-    safe: { owner: { address: string } };
+    safeHandler: string;
   }[] = await subgraphQueryPaginated(
     query,
     "modifySAFECollateralizations",
     config().SUBGRAPH_URL
   );
 
-  const events = data.map((x: any) => ({
-    type: RewardEventType.DELTA_DEBT,
-    value: Number(x.deltaDebt),
-    address: x.safe.owner.address,
-    logIndex: getLogIndexFromId(x.id),
-    timestamp: Number(x.createdAt),
-  }));
+  // Safe owners mapping
+  const owners = await getSafeOwnerMapping(end);
+
+  const events: RewardEvent[] = [];
+  for (let u of data) {
+    if (!owners.has(u.safeHandler)) {
+      console.log(`Safe handler ${u.safeHandler} has no owner`);
+      continue;
+    }
+
+    events.push({
+      type: RewardEventType.DELTA_DEBT,
+      value: Number(u.deltaDebt),
+      address: owners.get(u.safeHandler),
+      logIndex: getLogIndexFromId(u.id),
+      timestamp: Number(u.createdAt),
+    });
+  }
 
   console.log(`  Fetched ${events.length} safe modifications events`);
   return events;
