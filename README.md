@@ -1,6 +1,6 @@
 ## Run
 
-Add the following variable in a `.env` file
+Add the following variables in a `.env` file
 
 ```
 # Url of a subgraph
