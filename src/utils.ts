@@ -74,7 +74,7 @@ export const getSafeOwnerMapping = async (block: number) => {
   }[] = await subgraphQueryPaginated(
     query,
     "safeHandlerOwners",
-    config().SUBGRAPH_URL
+    config().GEB_SUBGRAPH_URL
   );
 
   console.log(`  Fetched ${res.length} safe owners`);

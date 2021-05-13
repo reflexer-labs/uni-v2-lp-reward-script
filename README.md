@@ -4,7 +4,7 @@ Add the following variables in a `.env` file
 
 ```
 # Url of a subgraph
-SUBGRAPH_URL=https://subgraph.reflexer.finance/subgraphs/name/reflexer-labs/rai
+GEB_SUBGRAPH_URL=https://subgraph.reflexer.finance/subgraphs/name/reflexer-labs/rai
 # Start of the campaign block
 START_BLOCK=11923942
 # End of the campaign block

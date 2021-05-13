@@ -10,7 +10,7 @@ import * as Chain from "../chain";
 
 describe("processRewardEvent", async () => {
   const configStub = ImportMock.mockFunction(Config, "config", {
-    SUBGRAPH_URL: "",
+    GEB_SUBGRAPH_URL: "",
     RPC_URL: "",
     START_BLOCK: 5,
     END_BLOCK: 15,

@@ -71,7 +71,11 @@ const getInitialSafesDebt = async (startBlock: number, endBlock: number) => {
   const debtsGraph: {
     debt: number;
     safeHandler: string;
-  }[] = await subgraphQueryPaginated(debtQuery, "safes", config().SUBGRAPH_URL);
+  }[] = await subgraphQueryPaginated(
+    debtQuery,
+    "safes",
+    config().GEB_SUBGRAPH_URL
+  );
 
   // Safe owners mapping
   const owners = await getSafeOwnerMapping(endBlock);
@@ -103,7 +107,7 @@ const getInitialRaiLpBalances = async (startBlock: number) => {
   }[] = await subgraphQueryPaginated(
     lpTokenBalancesQuery,
     "erc20Balances",
-    config().SUBGRAPH_URL
+    config().GEB_SUBGRAPH_URL
   );
 
   // We need the pool state to convert LP balance to RAI holdings
@@ -122,7 +126,7 @@ export const getAccumulatedRate = async (block: number) => {
     (
       await subgraphQuery(
         `{collateralType(id: "ETH-A", block: {number: ${block}}) {accumulatedRate}}`,
-        config().SUBGRAPH_URL
+        config().GEB_SUBGRAPH_URL
       )
     ).collateralType.accumulatedRate
   );

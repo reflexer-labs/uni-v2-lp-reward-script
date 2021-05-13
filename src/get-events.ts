@@ -93,11 +93,12 @@ const getSafeModificationEvents = async (
       }
     }`;
 
-  const safeModifications: SubgraphSafeModification[] = await subgraphQueryPaginated(
-    safeModificationQuery,
-    "modifySAFECollateralizations",
-    config().SUBGRAPH_URL
-  );
+  const safeModifications: SubgraphSafeModification[] =
+    await subgraphQueryPaginated(
+      safeModificationQuery,
+      "modifySAFECollateralizations",
+      config().GEB_SUBGRAPH_URL
+    );
 
   // Event used in liquidation
   const confiscateSAFECollateralAndDebtsQuery = `{
@@ -109,11 +110,12 @@ const getSafeModificationEvents = async (
     }
   }`;
 
-  const confiscateSAFECollateralAndDebts: SubgraphSafeModification[] = await subgraphQueryPaginated(
-    confiscateSAFECollateralAndDebtsQuery,
-    "confiscateSAFECollateralAndDebts",
-    config().SUBGRAPH_URL
-  );
+  const confiscateSAFECollateralAndDebts: SubgraphSafeModification[] =
+    await subgraphQueryPaginated(
+      confiscateSAFECollateralAndDebtsQuery,
+      "confiscateSAFECollateralAndDebts",
+      config().GEB_SUBGRAPH_URL
+    );
 
   // Event transferring debt, rarely used
   const transferSAFECollateralAndDebtsQuery = `{
@@ -135,10 +137,11 @@ const getSafeModificationEvents = async (
   }[] = await subgraphQueryPaginated(
     transferSAFECollateralAndDebtsQuery,
     "transferSAFECollateralAndDebts",
-    config().SUBGRAPH_URL
+    config().GEB_SUBGRAPH_URL
   );
 
-  const transferSAFECollateralAndDebtsProcessed: SubgraphSafeModification[] = [];
+  const transferSAFECollateralAndDebtsProcessed: SubgraphSafeModification[] =
+    [];
   for (let t of transferSAFECollateralAndDebts) {
     transferSAFECollateralAndDebtsProcessed.push({
       id: t.id,
@@ -208,7 +211,7 @@ const getLpBalanceDelta = async (
   }[] = await subgraphQueryPaginated(
     query,
     "erc20Transfers",
-    config().SUBGRAPH_URL
+    config().GEB_SUBGRAPH_URL
   );
 
   console.log(`  Fetched ${data.length} LP token transfers`);
@@ -256,7 +259,7 @@ const getSyncEvents = async (
   }[] = await subgraphQueryPaginated(
     query,
     "uniswapSyncs",
-    config().SUBGRAPH_URL
+    config().GEB_SUBGRAPH_URL
   );
 
   const events = data.map((x) => ({
@@ -288,7 +291,7 @@ const getUpdateAccumulatedRateEvent = async (
   }[] = await subgraphQueryPaginated(
     query,
     "updateAccumulatedRates",
-    config().SUBGRAPH_URL
+    config().GEB_SUBGRAPH_URL
   );
 
   const events = data.map((x) => ({
