@@ -193,7 +193,9 @@ const getLpBalanceDelta = async (
   end: number
 ): Promise<RewardEvent[]> => {
   const query = `{
-        erc20Transfers(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, label: "UNISWAP_POOL_TOKEN_COIN"}, first: 1000, skip: [[skip]]) {
+        erc20Transfers(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, tokenAddress: "${
+    config().UNISWAP_POOL_ADDRESS
+  }"}, first: 1000, skip: [[skip]]) {
           id
           source
           destination
@@ -245,7 +247,9 @@ const getSyncEvents = async (
   end: number
 ): Promise<RewardEvent[]> => {
   const query = `{
-            uniswapSyncs(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}}, first: 1000, skip: [[skip]]) {
+            uniswapSyncs(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, pari: ${
+    config().UNISWAP_POOL_ADDRESS
+  }, first: 1000, skip: [[skip]]) {
                 id
                 reserve0
                 createdAt

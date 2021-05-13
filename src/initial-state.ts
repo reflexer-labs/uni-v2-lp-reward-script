@@ -100,7 +100,9 @@ const getInitialSafesDebt = async (startBlock: number, endBlock: number) => {
 };
 
 const getInitialRaiLpBalances = async (startBlock: number) => {
-  const lpTokenBalancesQuery = `{erc20Balances(where: {label: "UNISWAP_POOL_TOKEN_COIN", balance_gt: 0}, first: 1000, skip: [[skip]], block: {number: ${startBlock}}), { balance, address }}`;
+  const lpTokenBalancesQuery = `{erc20Balances(where: {tokenAddress: "${
+    config().UNISWAP_POOL_ADDRESS
+  }", balance_gt: 0}, first: 1000, skip: [[skip]], block: {number: ${startBlock}}), { balance, address }}`;
   const balancesGraph: {
     balance: string;
     address: string;
@@ -134,14 +136,14 @@ export const getAccumulatedRate = async (block: number) => {
 
 export const getPoolState = async (block: number) => {
   const poolState = await subgraphQuery(
-    `{systemState(id: "current", block: {number: ${block} }) {coinUniswapPair{reserve0,totalSupply}}}`,
-    config().SUBGRAPH_URL
+    `{uniswapV2Pairs(block: {number: ${block} }, where: {address: "${
+      config().UNISWAP_POOL_ADDRESS
+    }"}) {reserve0,totalSupply}}`,
+    config().GEB_UNISWAP_SUBGRAPH_URL
   );
 
-  const uniRaiReserve = Number(poolState.systemState.coinUniswapPair.reserve0);
-  const totalLpSupply = Number(
-    poolState.systemState.coinUniswapPair.totalSupply
-  );
+  const uniRaiReserve = Number(poolState.uniswapV2Pairs[0].reserve0);
+  const totalLpSupply = Number(poolState.uniswapV2Pairs[0].totalSupply);
 
   return {
     uniRaiReserve,
