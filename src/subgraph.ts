@@ -34,6 +34,11 @@ export const subgraphQuery = async (
   }
 
   if (!resp.data || !resp.data.data) {
+
+    if(resp.data && resp.data.errors) {
+      console.log(resp.data.errors)
+    }
+    
     throw Error("No data");
   }
 

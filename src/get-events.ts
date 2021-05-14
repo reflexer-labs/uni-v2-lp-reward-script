@@ -213,7 +213,7 @@ const getLpBalanceDelta = async (
   }[] = await subgraphQueryPaginated(
     query,
     "erc20Transfers",
-    config().GEB_SUBGRAPH_URL
+    config().GEB_UNISWAP_SUBGRAPH_URL
   );
 
   console.log(`  Fetched ${data.length} LP token transfers`);
@@ -247,9 +247,9 @@ const getSyncEvents = async (
   end: number
 ): Promise<RewardEvent[]> => {
   const query = `{
-            uniswapSyncs(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, pari: ${
+    uniswapV2Syncs(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, pair: "${
     config().UNISWAP_POOL_ADDRESS
-  }, first: 1000, skip: [[skip]]) {
+  }"}, first: 1000, skip: [[skip]]) {
                 id
                 reserve0
                 createdAt
@@ -262,8 +262,8 @@ const getSyncEvents = async (
     createdAt: string;
   }[] = await subgraphQueryPaginated(
     query,
-    "uniswapSyncs",
-    config().GEB_SUBGRAPH_URL
+    "uniswapV2Syncs",
+    config().GEB_UNISWAP_SUBGRAPH_URL
   );
 
   const events = data.map((x) => ({
