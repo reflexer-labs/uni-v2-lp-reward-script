@@ -8,6 +8,8 @@ import {
   getSafeOwnerMapping,
 } from "./utils";
 
+const RAI_ADDRESS = "0x03ab458634910aad20ef5f1c8ee96f1d6ac54919".toLowerCase();
+
 export const getInitialState = async (startBlock: number, endBlock: number) => {
   console.log("Fetch initial state...");
 
@@ -109,7 +111,7 @@ const getInitialRaiLpBalances = async (startBlock: number) => {
   }[] = await subgraphQueryPaginated(
     lpTokenBalancesQuery,
     "erc20Balances",
-    config().GEB_SUBGRAPH_URL
+    config().GEB_UNISWAP_SUBGRAPH_URL
   );
 
   // We need the pool state to convert LP balance to RAI holdings
@@ -138,11 +140,20 @@ export const getPoolState = async (block: number) => {
   const poolState = await subgraphQuery(
     `{uniswapV2Pairs(block: {number: ${block} }, where: {address: "${
       config().UNISWAP_POOL_ADDRESS
-    }"}) {reserve0,totalSupply}}`,
+    }"}) {reserve0,reserve1,totalSupply,token0,token1}}`,
     config().GEB_UNISWAP_SUBGRAPH_URL
   );
 
-  const uniRaiReserve = Number(poolState.uniswapV2Pairs[0].reserve0);
+  let uniRaiReserve: number;
+
+  if (poolState.uniswapV2Pairs[0].token0 === RAI_ADDRESS) {
+    uniRaiReserve = Number(poolState.uniswapV2Pairs[0].reserve0);
+  } else if (poolState.uniswapV2Pairs[0].token1 === RAI_ADDRESS) {
+    uniRaiReserve = Number(poolState.uniswapV2Pairs[0].reserve1);
+  } else {
+    throw Error("Not a RAI pair");
+  }
+
   const totalLpSupply = Number(poolState.uniswapV2Pairs[0].totalSupply);
 
   return {
