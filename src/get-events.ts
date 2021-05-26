@@ -6,9 +6,12 @@ import { getExclusionList, getSafeOwnerMapping, NULL_ADDRESS } from "./utils";
 
 export const getEvents = async (startBlock: number, endBlock: number) => {
   console.log(`Fetch events ...`);
+  
+  const owners = await getSafeOwnerMapping(endBlock);
+
   const res = await Promise.all([
-    getSafeModificationEvents(startBlock, endBlock),
-    getLpBalanceDelta(startBlock, endBlock),
+    getSafeModificationEvents(startBlock, endBlock,owners),
+    getLpBalanceDelta(startBlock, endBlock, owners),
     getSyncEvents(startBlock, endBlock),
     getUpdateAccumulatedRateEvent(startBlock, endBlock),
   ]);
@@ -72,7 +75,8 @@ export const getEvents = async (startBlock: number, endBlock: number) => {
 
 const getSafeModificationEvents = async (
   start: number,
-  end: number
+  end: number,
+  ownerMapping: Map<string, string>
 ): Promise<RewardEvent[]> => {
   // We several kind of modifications
 
@@ -163,12 +167,9 @@ const getSafeModificationEvents = async (
     .concat(confiscateSAFECollateralAndDebts)
     .concat(transferSAFECollateralAndDebtsProcessed);
 
-  // Safe owners mapping
-  const owners = await getSafeOwnerMapping(end);
-
   const events: RewardEvent[] = [];
   for (let u of allModifications) {
-    if (!owners.has(u.safeHandler)) {
+    if (!ownerMapping.has(u.safeHandler)) {
       console.log(`Safe handler ${u.safeHandler} has no owner`);
       continue;
     }
@@ -176,7 +177,7 @@ const getSafeModificationEvents = async (
     events.push({
       type: RewardEventType.DELTA_DEBT,
       value: Number(u.deltaDebt),
-      address: owners.get(u.safeHandler),
+      address: ownerMapping.get(u.safeHandler),
       logIndex: getLogIndexFromId(u.id),
       timestamp: Number(u.createdAt),
     });
@@ -190,7 +191,8 @@ const getSafeModificationEvents = async (
 
 const getLpBalanceDelta = async (
   start: number,
-  end: number
+  end: number,
+  ownerMapping: Map<string, string>
 ): Promise<RewardEvent[]> => {
   const query = `{
         erc20Transfers(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, tokenAddress: "${
@@ -213,7 +215,7 @@ const getLpBalanceDelta = async (
   }[] = await subgraphQueryPaginated(
     query,
     "erc20Transfers",
-    config().GEB_UNISWAP_SUBGRAPH_URL
+    config().GEB_PERIPHERY_SUBGRAPH_URL
   );
 
   console.log(`  Fetched ${data.length} LP token transfers`);
@@ -239,6 +241,32 @@ const getLpBalanceDelta = async (
     });
   }
 
+  const saviorBalanceQuery = `{ saviorBalanceChanges(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, saviorAddress: "${
+    config().UNISWAP_SAVIOR_ADDRESS
+  }"},  first: 1000, skip: [[skip]]) { id, address, deltaBalance, createdAt } }`;
+  const saviorBalancesGraph: {
+    id: string;
+    deltaBalance: string;
+    address: string;
+    createdAt: string;
+  }[] = await subgraphQueryPaginated(saviorBalanceQuery, "saviorBalanceChanges", config().GEB_PERIPHERY_SUBGRAPH_URL);
+  
+  for(let event of saviorBalancesGraph) {
+    if(!ownerMapping.has(event.address)) {
+      console.log(`Safe handler ${event.address} has no owner`);
+    }
+
+    events.push({
+      type: RewardEventType.DELTA_LP,
+      value: Number(event.deltaBalance),
+      address: ownerMapping.get(event.address),
+      logIndex: getLogIndexFromId(event.id),
+      timestamp: Number(event.createdAt)
+    })
+  }
+
+  console.log(`  Fetched ${saviorBalancesGraph.length} savior LP token transfers`);
+
   return events;
 };
 
@@ -263,7 +291,7 @@ const getSyncEvents = async (
   }[] = await subgraphQueryPaginated(
     query,
     "uniswapV2Syncs",
-    config().GEB_UNISWAP_SUBGRAPH_URL
+    config().GEB_PERIPHERY_SUBGRAPH_URL
   );
 
   const events = data.map((x) => ({
