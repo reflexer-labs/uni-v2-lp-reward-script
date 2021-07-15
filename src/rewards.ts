@@ -69,6 +69,12 @@ export const processRewardEvent = async (
         // Convert to real debt after interests and update the debt balance
         const adjustedDeltaDebt = event.value * accumulatedRate;
         user.debt += adjustedDeltaDebt;
+
+        // Ignore Dusty debt 
+        if(user.debt < 0 && user.debt > -0.01) {
+          user.debt = 0
+        }
+                
         break;
       }
       case RewardEventType.DELTA_LP: {
