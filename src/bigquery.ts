@@ -3,8 +3,7 @@ import { BigQuery } from "@google-cloud/bigquery";
 // Get all instadapp accounts that exist
 export const getInstadappOwnerMapping = async () => {
   const query = `
-# DECLARE StartDate DEFAULT TIMESTAMP("2020-03-26 00:00:00+00");
-DECLARE StartDate DEFAULT TIMESTAMP("2021-07-23 00:00:00+00");
+DECLARE StartDate DEFAULT TIMESTAMP("2020-03-26 00:00:00+00");
 DECLARE BuildTopic DEFAULT "0x83435eca805f6256e4aa778ee8b2e8aec7485fa4b643a0fff05b7df6bf688389";
 DECLARE Indexcontract DEFAULT "0x2971adfa57b20e5a416ae5a708a8655a9c74f723";
 
