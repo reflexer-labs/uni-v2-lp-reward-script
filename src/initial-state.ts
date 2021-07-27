@@ -6,10 +6,9 @@ import { getExclusionList, getOrCreateUser, getSafeOwnerMapping } from "./utils"
 
 const RAI_ADDRESS = "0x03ab458634910aad20ef5f1c8ee96f1d6ac54919".toLowerCase();
 
-export const getInitialState = async (startBlock: number, endBlock: number) => {
+export const getInitialState = async (startBlock: number, endBlock: number, owners: Map<string, string>) => {
   console.log("Fetch initial state...");
 
-  const owners = await getSafeOwnerMapping(endBlock);
 
   // Get all LP token balance
   const balances = await getInitialRaiLpBalances(startBlock, owners);

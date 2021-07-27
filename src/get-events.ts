@@ -2,13 +2,11 @@ import { zeroPad } from "ethers/lib/utils";
 import { config } from "./config";
 import { subgraphQueryPaginated } from "./subgraph";
 import { RewardEvent, RewardEventType } from "./types";
-import { getExclusionList, getSafeOwnerMapping, NULL_ADDRESS } from "./utils";
+import { getExclusionList } from "./utils";
 
-export const getEvents = async (startBlock: number, endBlock: number) => {
+export const getEvents = async (startBlock: number, endBlock: number, owners: Map<string, string>) => {
   console.log(`Fetch events ...`);
   
-  const owners = await getSafeOwnerMapping(endBlock);
-
   const res = await Promise.all([
     getSafeModificationEvents(startBlock, endBlock,owners),
     getLpBalanceDelta(startBlock, endBlock, owners),
