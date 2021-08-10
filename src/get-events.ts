@@ -87,7 +87,7 @@ const getSafeModificationEvents = async (
 
   // Main event to modify a safe
   const safeModificationQuery = `{
-      modifySAFECollateralizations(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
+      modifySAFECollateralizations(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
         id
         deltaDebt
         safeHandler
@@ -103,7 +103,7 @@ const getSafeModificationEvents = async (
 
   // Event transferring debt, rarely used
   const transferSAFECollateralAndDebtsQuery = `{
-    transferSAFECollateralAndDebts(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
+    transferSAFECollateralAndDebts(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
       id
       deltaDebt
       createdAt
@@ -162,7 +162,7 @@ const getSafeModificationEvents = async (
 
   // Event used in liquidation
   const confiscateSAFECollateralAndDebtsQuery = `{
-      confiscateSAFECollateralAndDebts(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
+      confiscateSAFECollateralAndDebts(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
         id
         deltaDebt
         safeHandler
@@ -203,7 +203,7 @@ const getLpBalanceDelta = async (
   ownerMapping: Map<string, string>
 ): Promise<RewardEvent[]> => {
   const query = `{
-        erc20Transfers(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, tokenAddress: "${
+        erc20Transfers(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, tokenAddress: "${
     config().UNISWAP_POOL_ADDRESS
   }"}, first: 1000, skip: [[skip]]) {
           id
@@ -249,7 +249,7 @@ const getLpBalanceDelta = async (
     });
   }
 
-  const saviorBalanceQuery = `{ saviorBalanceChanges(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, saviorAddress: "${
+  const saviorBalanceQuery = `{ saviorBalanceChanges(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, saviorAddress: "${
     config().UNISWAP_SAVIOR_ADDRESS
   }"},  first: 1000, skip: [[skip]]) { id, address, deltaBalance, createdAt } }`;
   const saviorBalancesGraph: {
@@ -283,7 +283,7 @@ const getSyncEvents = async (
   end: number
 ): Promise<RewardEvent[]> => {
   const query = `{
-    uniswapV2Syncs(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, pair: "${
+    uniswapV2Syncs(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, pair: "${
     config().UNISWAP_POOL_ADDRESS
   }"}, first: 1000, skip: [[skip]]) {
                 id
@@ -317,7 +317,7 @@ const getUpdateAccumulatedRateEvent = async (
   end: number
 ): Promise<RewardEvent[]> => {
   const query = `{
-            updateAccumulatedRates(orderBy: accumulatedRate, orderDirection: desc where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}}, first: 1000, skip: [[skip]]) {
+            updateAccumulatedRates(orderBy: accumulatedRate, orderDirection: desc where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}}, first: 1000, skip: [[skip]]) {
               id
               rateMultiplier
               createdAt
