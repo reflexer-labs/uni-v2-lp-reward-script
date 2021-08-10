@@ -55,8 +55,8 @@ export const getEvents = async (startBlock: number, endBlock: number, owners: Ma
 
     if (
       e.type === RewardEventType.DELTA_LP ||
-      // @ts-ignore
-      e.type === RewardEventType.DELTA_DEBT
+      e.type === RewardEventType.DELTA_DEBT ||
+      e.type === RewardEventType.LIQUIDATION
     ) {
       if (!e.address) {
         throw Error(`Inconsistent event: ${JSON.stringify(e)}`);
@@ -95,29 +95,11 @@ const getSafeModificationEvents = async (
       }
     }`;
 
-  const safeModifications: SubgraphSafeModification[] =
-    await subgraphQueryPaginated(
-      safeModificationQuery,
-      "modifySAFECollateralizations",
-      config().GEB_SUBGRAPH_URL
-    );
-
-  // Event used in liquidation
-  const confiscateSAFECollateralAndDebtsQuery = `{
-    confiscateSAFECollateralAndDebts(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
-      id
-      deltaDebt
-      safeHandler
-      createdAt
-    }
-  }`;
-
-  const confiscateSAFECollateralAndDebts: SubgraphSafeModification[] =
-    await subgraphQueryPaginated(
-      confiscateSAFECollateralAndDebtsQuery,
-      "confiscateSAFECollateralAndDebts",
-      config().GEB_SUBGRAPH_URL
-    );
+  const safeModifications: SubgraphSafeModification[] = await subgraphQueryPaginated(
+    safeModificationQuery,
+    "modifySAFECollateralizations",
+    config().GEB_SUBGRAPH_URL
+  );
 
   // Event transferring debt, rarely used
   const transferSAFECollateralAndDebtsQuery = `{
@@ -142,8 +124,7 @@ const getSafeModificationEvents = async (
     config().GEB_SUBGRAPH_URL
   );
 
-  const transferSAFECollateralAndDebtsProcessed: SubgraphSafeModification[] =
-    [];
+  const transferSAFECollateralAndDebtsProcessed: SubgraphSafeModification[] = [];
   for (let t of transferSAFECollateralAndDebts) {
     transferSAFECollateralAndDebtsProcessed.push({
       id: t.id,
@@ -161,9 +142,7 @@ const getSafeModificationEvents = async (
   }
 
   // Merge all the different kind of modifications
-  const allModifications = safeModifications
-    .concat(confiscateSAFECollateralAndDebts)
-    .concat(transferSAFECollateralAndDebtsProcessed);
+  const allModifications = safeModifications.concat(transferSAFECollateralAndDebtsProcessed);
 
   const events: RewardEvent[] = [];
   for (let u of allModifications) {
@@ -174,6 +153,37 @@ const getSafeModificationEvents = async (
 
     events.push({
       type: RewardEventType.DELTA_DEBT,
+      value: Number(u.deltaDebt),
+      address: ownerMapping.get(u.safeHandler),
+      logIndex: getLogIndexFromId(u.id),
+      timestamp: Number(u.createdAt),
+    });
+  }
+
+  // Event used in liquidation
+  const confiscateSAFECollateralAndDebtsQuery = `{
+      confiscateSAFECollateralAndDebts(where: {createdAtBlock_gte: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
+        id
+        deltaDebt
+        safeHandler
+        createdAt
+      }
+    }`;
+
+  const confiscateSAFECollateralAndDebts: SubgraphSafeModification[] = await subgraphQueryPaginated(
+    confiscateSAFECollateralAndDebtsQuery,
+    "confiscateSAFECollateralAndDebts",
+    config().GEB_SUBGRAPH_URL
+  );
+
+  for (let u of confiscateSAFECollateralAndDebts) {
+    if (!ownerMapping.has(u.safeHandler)) {
+      console.log(`Safe handler ${u.safeHandler} has no owner`);
+      continue;
+    }
+
+    events.push({
+      type: RewardEventType.LIQUIDATION,
       value: Number(u.deltaDebt),
       address: ownerMapping.get(u.safeHandler),
       logIndex: getLogIndexFromId(u.id),

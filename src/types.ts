@@ -5,7 +5,7 @@ export type UserAccount = {
   raiLpBalance: number;
   stakingWeight: number;
   rewardPerWeightStored: number;
-  earned: number
+  earned: number;
 };
 
 // Main data structure
@@ -18,6 +18,7 @@ export enum RewardEventType {
   DELTA_LP,
   POOL_SYNC,
   UPDATE_ACCUMULATED_RATE,
+  LIQUIDATION,
 }
 
 export type RewardEvent = {

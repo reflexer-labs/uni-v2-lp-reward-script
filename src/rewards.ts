@@ -62,6 +62,13 @@ export const processRewardEvent = async (
 
     // The way the rewards are credited is different for each event type
     switch (event.type) {
+      case RewardEventType.LIQUIDATION: {
+        const user = getOrCreateUser(event.address, users);
+        earn(user, rewardPerWeight);
+
+        user.debt += event.value;
+        break
+      }
       case RewardEventType.DELTA_DEBT: {
         const user = getOrCreateUser(event.address, users);
         earn(user, rewardPerWeight);
