@@ -78,7 +78,7 @@ export const processRewardEvent = async (
         user.debt += adjustedDeltaDebt;
 
         // Ignore Dusty debt 
-        if(user.debt < 0 && user.debt > -0.01) {
+        if(user.debt < 0 && user.debt > -0.34) {
           user.debt = 0
         }
                 
