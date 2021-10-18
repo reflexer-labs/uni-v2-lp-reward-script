@@ -46,7 +46,7 @@ export const exportResults = (users: UserList) => {
   );
 
   // CSV dump
-  let w = "Address,Reward\n";
+  let w = "";
   for (let u of userReward) {
     w += `${u[0]},${u[1]}\n`;
   }
