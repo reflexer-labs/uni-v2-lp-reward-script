@@ -2,6 +2,9 @@ import { BigQuery } from "@google-cloud/bigquery";
 
 // Get all instadapp accounts that exist
 export const getInstadappOwnerMapping = async () => {
+  // Unused
+  // Instadapp was implemented but they ended never really supporting Reflexer
+  return new Map<string, string>();
   const query = `
 DECLARE StartDate DEFAULT TIMESTAMP("2020-03-26 00:00:00+00");
 DECLARE BuildTopic DEFAULT "0x83435eca805f6256e4aa778ee8b2e8aec7485fa4b643a0fff05b7df6bf688389";
