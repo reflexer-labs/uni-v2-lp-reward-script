@@ -8,10 +8,8 @@ export const getEvents = async (startBlock: number, endBlock: number, owners: Ma
   console.log(`Fetch events ...`);
   
   const res = await Promise.all([
-    getSafeModificationEvents(startBlock, endBlock,owners),
     getLpBalanceDelta(startBlock, endBlock, owners),
     getSyncEvents(startBlock, endBlock),
-    getUpdateAccumulatedRateEvent(startBlock, endBlock),
   ]);
 
   // Merge all events
@@ -54,9 +52,7 @@ export const getEvents = async (startBlock: number, endBlock: number, owners: Ma
     }
 
     if (
-      e.type === RewardEventType.DELTA_LP ||
-      e.type === RewardEventType.DELTA_DEBT ||
-      e.type === RewardEventType.LIQUIDATION
+      e.type === RewardEventType.DELTA_LP
     ) {
       if (!e.address) {
         throw Error(`Inconsistent event: ${JSON.stringify(e)}`);
@@ -68,132 +64,6 @@ export const getEvents = async (startBlock: number, endBlock: number, owners: Ma
     }
   }
 
-  return events;
-};
-
-const getSafeModificationEvents = async (
-  start: number,
-  end: number,
-  ownerMapping: Map<string, string>
-): Promise<RewardEvent[]> => {
-  // We several kind of modifications
-
-  type SubgraphSafeModification = {
-    id: string;
-    deltaDebt: string;
-    createdAt: string;
-    safeHandler: string;
-  };
-
-  // Main event to modify a safe
-  const safeModificationQuery = `{
-      modifySAFECollateralizations(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
-        id
-        deltaDebt
-        safeHandler
-        createdAt
-      }
-    }`;
-
-  const safeModifications: SubgraphSafeModification[] = await subgraphQueryPaginated(
-    safeModificationQuery,
-    "modifySAFECollateralizations",
-    config().GEB_SUBGRAPH_URL
-  );
-
-  // Event transferring debt, rarely used
-  const transferSAFECollateralAndDebtsQuery = `{
-    transferSAFECollateralAndDebts(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
-      id
-      deltaDebt
-      createdAt
-      srcHandler
-      dstHandler
-    }
-  }`;
-
-  const transferSAFECollateralAndDebts: {
-    id: string;
-    deltaDebt: string;
-    createdAt: string;
-    srcHandler: string;
-    dstHandler: string;
-  }[] = await subgraphQueryPaginated(
-    transferSAFECollateralAndDebtsQuery,
-    "transferSAFECollateralAndDebts",
-    config().GEB_SUBGRAPH_URL
-  );
-
-  const transferSAFECollateralAndDebtsProcessed: SubgraphSafeModification[] = [];
-  for (let t of transferSAFECollateralAndDebts) {
-    transferSAFECollateralAndDebtsProcessed.push({
-      id: t.id,
-      deltaDebt: t.deltaDebt,
-      safeHandler: t.dstHandler,
-      createdAt: t.createdAt,
-    });
-
-    transferSAFECollateralAndDebtsProcessed.push({
-      id: t.id,
-      deltaDebt: (-1 * Number(t.deltaDebt)).toString(),
-      safeHandler: t.srcHandler,
-      createdAt: t.createdAt,
-    });
-  }
-
-  // Merge all the different kind of modifications
-  const allModifications = safeModifications.concat(transferSAFECollateralAndDebtsProcessed);
-
-  const events: RewardEvent[] = [];
-  for (let u of allModifications) {
-    if (!ownerMapping.has(u.safeHandler)) {
-      console.log(`Safe handler ${u.safeHandler} has no owner`);
-      continue;
-    }
-
-    events.push({
-      type: RewardEventType.DELTA_DEBT,
-      value: Number(u.deltaDebt),
-      address: ownerMapping.get(u.safeHandler),
-      logIndex: getLogIndexFromId(u.id),
-      timestamp: Number(u.createdAt),
-    });
-  }
-
-  // Event used in liquidation
-  const confiscateSAFECollateralAndDebtsQuery = `{
-      confiscateSAFECollateralAndDebts(where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}, deltaDebt_not: 0}, first: 1000, skip: [[skip]]) {
-        id
-        deltaDebt
-        safeHandler
-        createdAt
-      }
-    }`;
-
-  const confiscateSAFECollateralAndDebts: SubgraphSafeModification[] = await subgraphQueryPaginated(
-    confiscateSAFECollateralAndDebtsQuery,
-    "confiscateSAFECollateralAndDebts",
-    config().GEB_SUBGRAPH_URL
-  );
-
-  for (let u of confiscateSAFECollateralAndDebts) {
-    if (!ownerMapping.has(u.safeHandler)) {
-      console.log(`Safe handler ${u.safeHandler} has no owner`);
-      continue;
-    }
-
-    events.push({
-      type: RewardEventType.LIQUIDATION,
-      value: Number(u.deltaDebt),
-      address: ownerMapping.get(u.safeHandler),
-      logIndex: getLogIndexFromId(u.id),
-      timestamp: Number(u.createdAt),
-    });
-  }
-
-  console.log(
-    `  Fetched ${events.length} safe modifications events including ${safeModifications.length} standard safe modification, ${confiscateSAFECollateralAndDebts.length} safe confiscations, ${transferSAFECollateralAndDebts.length} transfer safe debt`
-  );
   return events;
 };
 
@@ -309,38 +179,6 @@ const getSyncEvents = async (
     timestamp: Number(x.createdAt),
   }));
   console.log(`  Fetched ${events.length} Uniswap syncs events`);
-  return events;
-};
-
-const getUpdateAccumulatedRateEvent = async (
-  start: number,
-  end: number
-): Promise<RewardEvent[]> => {
-  const query = `{
-            updateAccumulatedRates(orderBy: accumulatedRate, orderDirection: desc where: {createdAtBlock_gt: ${start}, createdAtBlock_lte: ${end}}, first: 1000, skip: [[skip]]) {
-              id
-              rateMultiplier
-              createdAt
-            }
-        }`;
-
-  const data: {
-    id: string;
-    rateMultiplier: string;
-    createdAt: string;
-  }[] = await subgraphQueryPaginated(
-    query,
-    "updateAccumulatedRates",
-    config().GEB_SUBGRAPH_URL
-  );
-
-  const events = data.map((x) => ({
-    type: RewardEventType.UPDATE_ACCUMULATED_RATE,
-    value: Number(x.rateMultiplier),
-    logIndex: getLogIndexFromId(x.id),
-    timestamp: Number(x.createdAt),
-  }));
-  console.log(`  Fetched ${events.length} accumulated rate events`);
   return events;
 };
 

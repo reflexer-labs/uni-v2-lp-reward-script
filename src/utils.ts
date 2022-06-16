@@ -83,7 +83,7 @@ export const getSafeOwnerMapping = async (block: number) => {
   for (let a of res) {
     if (instaAccounts.has(a.owner.address)) {
       // It's an Instadapp account use its owner
-      owners.set(a.id, instaAccounts.get(a.owner.address));
+      owners.set(a.id, instaAccounts.get(a.owner.address)!);
     } else {
       owners.set(a.id, a.owner.address);
     }

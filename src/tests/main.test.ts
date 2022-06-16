@@ -17,7 +17,6 @@ describe("processRewardEvent", async () => {
     REWARD_AMOUNT: 10,
   });
 
-  ImportMock.mockOther(InitialState, "getAccumulatedRate", async (b) => 1);
   ImportMock.mockOther(InitialState, "getPoolState", async (b) => ({
     uniRaiReserve: 100,
     totalLpSupply: 20,
@@ -33,17 +32,13 @@ describe("processRewardEvent", async () => {
   it("Constant distribution with 2 users", async () => {
     let users: UserList = {
       Alice: {
-        debt: 10,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
       },
       Bob: {
-        debt: 30,
         lpBalance: 30,
-        raiLpBalance: 30,
         stakingWeight: 30,
         rewardPerWeightStored: 0,
         earned: 0,
@@ -63,9 +58,7 @@ describe("processRewardEvent", async () => {
   it("Add/remove/add debt alone with high prior LP", async () => {
     let users: UserList = {
       Alice: {
-        debt: 0,
         lpBalance: 15,
-        raiLpBalance: (15 * 100) / 15,
         stakingWeight: 0,
         rewardPerWeightStored: 0,
         earned: 0,
@@ -73,34 +66,6 @@ describe("processRewardEvent", async () => {
     };
 
     const events: RewardEvent[] = [
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Bob",
-        value: 10,
-        timestamp: 6,
-        logIndex: 0,
-      },
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: 10,
-        timestamp: 8,
-        logIndex: 0,
-      },
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: -10,
-        timestamp: 10,
-        logIndex: 0,
-      },
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: 10,
-        timestamp: 12,
-        logIndex: 0,
-      },
     ];
 
     users = await processRewardEvent(users, events);
@@ -114,17 +79,13 @@ describe("processRewardEvent", async () => {
   it("Add/remove/add debt while bob is there", async () => {
     let users: UserList = {
       Alice: {
-        debt: 0,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 0,
         rewardPerWeightStored: 0,
         earned: 0,
       },
       Bob: {
-        debt: 10,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
@@ -132,27 +93,6 @@ describe("processRewardEvent", async () => {
     };
 
     const events: RewardEvent[] = [
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: 10,
-        timestamp: 8,
-        logIndex: 0,
-      },
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: -10,
-        timestamp: 10,
-        logIndex: 0,
-      },
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: 10,
-        timestamp: 12,
-        logIndex: 0,
-      },
     ];
 
     users = await processRewardEvent(users, events);
@@ -166,17 +106,13 @@ describe("processRewardEvent", async () => {
   it("Add/remove/add lp while bob is there", async () => {
     let users: UserList = {
       Alice: {
-        debt: 0,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 0,
         rewardPerWeightStored: 0,
         earned: 0,
       },
       Bob: {
-        debt: 10,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
@@ -184,13 +120,6 @@ describe("processRewardEvent", async () => {
     };
 
     const events: RewardEvent[] = [
-      {
-        type: RewardEventType.DELTA_DEBT,
-        address: "Alice",
-        value: 10,
-        timestamp: 8,
-        logIndex: 0,
-      },
       {
         type: RewardEventType.DELTA_LP,
         address: "Alice",
@@ -218,17 +147,13 @@ describe("processRewardEvent", async () => {
   it("A big price move affects rewards", async () => {
     let users: UserList = {
       Alice: {
-        debt: 10,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
       },
       Bob: {
-        debt: 10,
         lpBalance: 10,
-        raiLpBalance: 10,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
@@ -256,17 +181,13 @@ describe("processRewardEvent", async () => {
   it("Update accumulated rate increases everyone's debt", async () => {
     let users: UserList = {
       Alice: {
-        debt: 10,
         lpBalance: 11,
-        raiLpBalance: 11,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
       },
       Bob: {
-        debt: 10,
         lpBalance: 11,
-        raiLpBalance: 11,
         stakingWeight: 10,
         rewardPerWeightStored: 0,
         earned: 0,
@@ -274,12 +195,6 @@ describe("processRewardEvent", async () => {
     };
 
     const events: RewardEvent[] = [
-      {
-        type: RewardEventType.UPDATE_ACCUMULATED_RATE,
-        value: 0.1,
-        timestamp: 10,
-        logIndex: 0,
-      },
     ];
 
     users = await processRewardEvent(users, events);
@@ -288,7 +203,5 @@ describe("processRewardEvent", async () => {
     expect(users["Bob"].earned).equal(5);
     expect(users["Alice"].stakingWeight).equal(11);
     expect(users["Bob"].stakingWeight).equal(11);
-    expect(users["Alice"].debt).equal(11);
-    expect(users["Bob"].debt).equal(11);
   });
 });

@@ -9,29 +9,17 @@ const RAI_ADDRESS = "0x03ab458634910aad20ef5f1c8ee96f1d6ac54919".toLowerCase();
 export const getInitialState = async (startBlock: number, endBlock: number, owners: Map<string, string>) => {
   console.log("Fetch initial state...");
 
-
   // Get all LP token balance
   const balances = await getInitialRaiLpBalances(startBlock, owners);
 
   console.log(`  Fetched ${balances.length} LP token balances`);
-  // Get all debts
-  const debts = await getInitialSafesDebt(startBlock, owners);
-
-  console.log(`  Fetched ${debts.length} debt balances`);
 
   // Combine debt and LP balances
   const users: UserList = {};
   for (let bal of balances) {
     const user = getOrCreateUser(bal.address, users);
     user.lpBalance = bal.lpBalance;
-    user.raiLpBalance = bal.raiLpBalance;
     users[bal.address] = user;
-  }
-
-  for (let debt of debts) {
-    const user = getOrCreateUser(debt.address, users);
-    user.debt += debt.debt;
-    users[debt.address] = user;
   }
 
   // Remove accounts from the exclusion list
@@ -42,16 +30,16 @@ export const getInitialState = async (startBlock: number, endBlock: number, owne
 
   // Set the initial staking weights
   Object.values(users).map((u) => {
-    u.stakingWeight = Math.min(u.debt, u.raiLpBalance);
+    u.stakingWeight = u.lpBalance;
   });
+
+  users[config().UNISWAP_SAVIOR_ADDRESS].stakingWeight = 0;
 
   // Sanity checks
   for (let user of Object.values(users)) {
     if (
-      user.debt == undefined ||
       user.earned == undefined ||
       user.lpBalance == undefined ||
-      user.raiLpBalance == undefined ||
       user.rewardPerWeightStored == undefined ||
       user.stakingWeight == undefined
     ) {
@@ -63,37 +51,8 @@ export const getInitialState = async (startBlock: number, endBlock: number, owne
   return users;
 };
 
-const getInitialSafesDebt = async (startBlock: number, ownerMapping: Map<string, string>) => {
-  const debtQuery = `{safes(where: {debt_gt: 0}, first: 1000, skip: [[skip]],block: {number:${startBlock}}) {debt, safeHandler}}`;
-  const debtsGraph: {
-    debt: number;
-    safeHandler: string;
-  }[] = await subgraphQueryPaginated(debtQuery, "safes", config().GEB_SUBGRAPH_URL);
-
-  // We need the adjusted debt after accumulated rate for the initial state
-  const accumulatedRate = await getAccumulatedRate(startBlock);
-
-  let debts: { address: string; debt: number }[] = [];
-  for (let u of debtsGraph) {
-    if (!ownerMapping.has(u.safeHandler)) {
-      console.log(`Safe handler ${u.safeHandler} has no owner`);
-      continue;
-    }
-
-    debts.push({
-      address: ownerMapping.get(u.safeHandler),
-      debt: Number(u.debt) * accumulatedRate,
-    });
-  }
-
-  return debts;
-};
-
 const getInitialRaiLpBalances = async (startBlock: number, ownerMapping: Map<string, string>) => {
   // We need the pool state to convert LP balance to RAI holdings
-  const { uniRaiReserve, totalLpSupply } = await getPoolState(startBlock);
-
-  const getRaiFromLpBalance = (lpAmount: number) => (lpAmount * uniRaiReserve) / totalLpSupply;
 
   // Get the LP token balance at start
   const lpTokenBalancesQuery = `{erc20Balances(where: {tokenAddress: "${
@@ -102,13 +61,16 @@ const getInitialRaiLpBalances = async (startBlock: number, ownerMapping: Map<str
   const balancesGraph: {
     balance: string;
     address: string;
-  }[] = await subgraphQueryPaginated(lpTokenBalancesQuery, "erc20Balances", config().GEB_PERIPHERY_SUBGRAPH_URL);
+  }[] = await subgraphQueryPaginated(
+    lpTokenBalancesQuery,
+    "erc20Balances",
+    config().GEB_PERIPHERY_SUBGRAPH_URL
+  );
 
-  const balances = balancesGraph.map((x) => ({
+  let balances = balancesGraph.map((x) => ({
     address: x.address,
     lpBalance: Number(x.balance),
     // RAI LP balance = LP balance * RAI reserve  / total LP supply
-    raiLpBalance: getRaiFromLpBalance(Number(x.balance)),
   }));
 
   // Get the savior LP token balances at start
@@ -118,7 +80,11 @@ const getInitialRaiLpBalances = async (startBlock: number, ownerMapping: Map<str
   const saviorBalancesGraph: {
     balance: string;
     address: string;
-  }[] = await subgraphQueryPaginated(saviorBalanceQuery, "saviorBalances", config().GEB_PERIPHERY_SUBGRAPH_URL);
+  }[] = await subgraphQueryPaginated(
+    saviorBalanceQuery,
+    "saviorBalances",
+    config().GEB_PERIPHERY_SUBGRAPH_URL
+  );
 
   // Retrieve real owner of the LP token balance
   const saviorBalances = saviorBalancesGraph.map((x) => {
@@ -126,7 +92,7 @@ const getInitialRaiLpBalances = async (startBlock: number, ownerMapping: Map<str
       console.log(`safeHandler without owner ${x.address}`);
     }
 
-    return { address: ownerMapping.get(x.address), balance: Number(x.balance) };
+    return { address: ownerMapping.get(x.address)!, balance: Number(x.balance) };
   });
 
   // Add the savior balance to the LP balances
@@ -135,12 +101,10 @@ const getInitialRaiLpBalances = async (startBlock: number, ownerMapping: Map<str
 
     if (i >= 0) {
       balances[i].lpBalance += saviorBalance.balance;
-      balances[i].raiLpBalance = getRaiFromLpBalance(balances[i].lpBalance);
     } else {
       balances.push({
         address: saviorBalance.address,
         lpBalance: saviorBalance.balance,
-        raiLpBalance: getRaiFromLpBalance(saviorBalance.balance),
       });
     }
   }
@@ -150,16 +114,11 @@ const getInitialRaiLpBalances = async (startBlock: number, ownerMapping: Map<str
   return balances;
 };
 
-export const getAccumulatedRate = async (block: number) => {
-  return Number(
-    (await subgraphQuery(`{collateralType(id: "ETH-A", block: {number: ${block}}) {accumulatedRate}}`, config().GEB_SUBGRAPH_URL)).collateralType
-      .accumulatedRate
-  );
-};
-
 export const getPoolState = async (block: number) => {
   const poolState = await subgraphQuery(
-    `{uniswapV2Pairs(block: {number: ${block} }, where: {address: "${config().UNISWAP_POOL_ADDRESS}"}) {reserve0,reserve1,totalSupply,token0,token1}}`,
+    `{uniswapV2Pairs(block: {number: ${block} }, where: {address: "${
+      config().UNISWAP_POOL_ADDRESS
+    }"}) {reserve0,reserve1,totalSupply,token0,token1}}`,
     config().GEB_PERIPHERY_SUBGRAPH_URL
   );
 

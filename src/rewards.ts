@@ -1,14 +1,11 @@
 import { config } from "./config";
-import { getAccumulatedRate, getPoolState } from "./initial-state";
+import { getPoolState } from "./initial-state";
 import { RewardEvent, RewardEventType, UserAccount, UserList } from "./types";
 import { getOrCreateUser, NULL_ADDRESS, roundToZero } from "./utils";
 import { provider } from "./chain";
 import { finalSanityChecks, sanityCheckAllUsers } from "./sanity-checks";
 
-export const processRewardEvent = async (
-  users: UserList,
-  events: RewardEvent[]
-): Promise<UserList> => {
+export const processRewardEvent = async (users: UserList, events: RewardEvent[]): Promise<UserList> => {
   // Starting and ending of the campaign
   const startBlock = config().START_BLOCK;
   const endBlock = config().END_BLOCK;
@@ -33,9 +30,6 @@ export const processRewardEvent = async (
 
   // Ongoing time
   let timestamp = startTimestamp;
-
-  // Ongoing accumulated rate
-  let accumulatedRate = await getAccumulatedRate(startBlock);
 
   // Ongoing RAI reserve and LP total supply, this is needed to convert LP balance to RAI LP Balance
   let { uniRaiReserve, totalLpSupply } = await getPoolState(startBlock);
@@ -62,28 +56,6 @@ export const processRewardEvent = async (
 
     // The way the rewards are credited is different for each event type
     switch (event.type) {
-      case RewardEventType.LIQUIDATION: {
-        const user = getOrCreateUser(event.address, users);
-        earn(user, rewardPerWeight);
-
-        user.debt += event.value;
-        break
-      }
-      case RewardEventType.DELTA_DEBT: {
-        const user = getOrCreateUser(event.address, users);
-        earn(user, rewardPerWeight);
-
-        // Convert to real debt after interests and update the debt balance
-        const adjustedDeltaDebt = event.value * accumulatedRate;
-        user.debt += adjustedDeltaDebt;
-
-        // Ignore Dusty debt 
-        if(user.debt < 0 && user.debt > -0.38) {
-          user.debt = 0
-        }
-                
-        break;
-      }
       case RewardEventType.DELTA_LP: {
         if (event.address === NULL_ADDRESS) {
           // This is a mint or a burn of LP tokens, update the total supply
@@ -94,13 +66,10 @@ export const processRewardEvent = async (
           }
         } else {
           // Credit user rewards
-          const user = getOrCreateUser(event.address, users);
+          const user = getOrCreateUser(event.address!, users);
           earn(user, rewardPerWeight);
 
           user.lpBalance = roundToZero(user.lpBalance + event.value);
-
-          // Convert LP amount to RAI-LP amount
-          user.raiLpBalance = (uniRaiReserve * user.lpBalance) / totalLpSupply;
         }
         break;
       }
@@ -111,24 +80,6 @@ export const processRewardEvent = async (
 
         // First credit all users
         Object.values(users).map((u) => earn(u, rewardPerWeight));
-
-        // Then update everyone's RAI-LP balance according to the new RAI reserve
-        Object.values(users).map(
-          (u) =>
-            (u.raiLpBalance = (u.lpBalance * uniRaiReserve) / totalLpSupply)
-        );
-        break;
-      }
-      case RewardEventType.UPDATE_ACCUMULATED_RATE: {
-        // Update accumulated rate increases everyone's debt by the rate multiplier
-        const rateMultiplier = event.value;
-        accumulatedRate += rateMultiplier;
-
-        // First credit all users
-        Object.values(users).map((u) => earn(u, rewardPerWeight));
-
-        // Update everyone's debt
-        Object.values(users).map((u) => (u.debt *= rateMultiplier + 1));
         break;
       }
       default:
@@ -138,9 +89,10 @@ export const processRewardEvent = async (
     sanityCheckAllUsers(users, event);
 
     // Recalculate the sum of weights since the events changed the totalSupply of weights
-    Object.values(users).map(
-      (u) => (u.stakingWeight = Math.min(u.debt, u.raiLpBalance))
-    );
+    Object.values(users).map((u) => (u.stakingWeight = u.lpBalance));
+
+    users[config().UNISWAP_SAVIOR_ADDRESS].stakingWeight = 0;
+
     totalStakingWeight = sumAllWeights(users);
 
     if (totalStakingWeight === 0) {
@@ -153,14 +105,7 @@ export const processRewardEvent = async (
   Object.values(users).map((u) => earn(u, rewardPerWeight));
 
   // Sanity check
-  finalSanityChecks(
-    timestamp,
-    accumulatedRate,
-    totalLpSupply,
-    uniRaiReserve,
-    users,
-    endBlock
-  );
+  finalSanityChecks(timestamp, totalLpSupply, uniRaiReserve, users, endBlock);
 
   return users;
 };
@@ -168,8 +113,7 @@ export const processRewardEvent = async (
 // Credit reward to a user
 const earn = (user: UserAccount, rewardPerWeight: number) => {
   // Credit to the user his due rewards
-  user.earned +=
-    (rewardPerWeight - user.rewardPerWeightStored) * user.stakingWeight;
+  user.earned += (rewardPerWeight - user.rewardPerWeightStored) * user.stakingWeight;
 
   // Store his cumulative credited rewards for next time
   user.rewardPerWeightStored = rewardPerWeight;

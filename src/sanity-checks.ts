@@ -1,11 +1,10 @@
-import { getAccumulatedRate, getPoolState } from "./initial-state";
+import { getPoolState } from "./initial-state";
 import { NULL_ADDRESS, roundToZero } from "./utils";
 import { provider } from "./chain";
 import { RewardEvent, UserList } from "./types";
 
 export const finalSanityChecks = async (
   finalTimestamp: number,
-  finalAccumulatedRate: number,
   finalTotalLpSupply: number,
   finalUniRaiReserve: number,
   finalUsers: UserList,
@@ -14,13 +13,6 @@ export const finalSanityChecks = async (
   const endTimestamp = (await provider.getBlock(endBlock)).timestamp;
   if (finalTimestamp > endTimestamp) {
     throw Error("Impossible final timestamp");
-  }
-
-  const expectedAccumulatedRate = await getAccumulatedRate(endBlock);
-  if (roundToZero(expectedAccumulatedRate - finalAccumulatedRate)) {
-    throw Error(
-      `Invalid final accumulated rate. Get ${finalAccumulatedRate} expected ${expectedAccumulatedRate}`
-    );
   }
 
   const finalPoolState = await getPoolState(endBlock);
@@ -50,9 +42,7 @@ export const sanityCheckAllUsers = (users: UserList, event: RewardEvent) => {
   if (event.address && event.address !== NULL_ADDRESS) {
     const usr = users[event.address];
     if (
-      numberCheck(usr.debt) ||
       numberCheck(usr.lpBalance) ||
-      numberCheck(usr.raiLpBalance) ||
       numberCheck(usr.stakingWeight) ||
       numberCheck(usr.earned) ||
       numberCheck(usr.rewardPerWeightStored)

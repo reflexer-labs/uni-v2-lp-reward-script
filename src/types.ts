@@ -1,8 +1,6 @@
 // For a single user
 export type UserAccount = {
-  debt: number;
   lpBalance: number;
-  raiLpBalance: number;
   stakingWeight: number;
   rewardPerWeightStored: number;
   earned: number;
@@ -14,11 +12,8 @@ export type UserList = {
 };
 
 export enum RewardEventType {
-  DELTA_DEBT,
   DELTA_LP,
   POOL_SYNC,
-  UPDATE_ACCUMULATED_RATE,
-  LIQUIDATION,
 }
 
 export type RewardEvent = {
